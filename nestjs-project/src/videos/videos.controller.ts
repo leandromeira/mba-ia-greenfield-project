@@ -1,11 +1,15 @@
 import {
   Body,
   Controller,
+  Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -14,6 +18,7 @@ import {
   getSchemaPath,
 } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import type { JwtPayload } from '../auth/auth.types';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoUploadDto } from './dto/create-video-upload.dto';
@@ -92,5 +97,68 @@ export class VideosController {
     @Param('id') id: string,
   ) {
     return this.videosService.completeUpload(user.sub, id);
+  }
+
+  @Public()
+  @Get(':slug/stream')
+  @HttpCode(HttpStatus.PARTIAL_CONTENT)
+  @ApiOperation({
+    summary: 'Stream video (HTTP 206 Partial Content)',
+    description:
+      'Public endpoint to stream video content with Range header support for video seeking.',
+  })
+  @ApiResponse({
+    status: 206,
+    description: 'Partial content video stream',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async streamVideo(
+    @Param('slug') slug: string,
+    @Headers('range') range: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { stream, contentLength, contentRange, contentType } =
+      await this.videosService.getVideoStream(slug, range);
+
+    res.setHeader('Accept-Ranges', 'bytes');
+    if (contentType) res.setHeader('Content-Type', contentType);
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    if (range && contentRange) {
+      res.status(HttpStatus.PARTIAL_CONTENT);
+      res.setHeader('Content-Range', contentRange);
+    } else {
+      res.status(HttpStatus.OK);
+    }
+
+    stream.pipe(res);
+  }
+
+  @Public()
+  @Get(':slug/download')
+  @ApiOperation({
+    summary: 'Get video download URL',
+    description:
+      'Public endpoint to obtain a direct presigned GET download URL with attachment disposition.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Redirects to presigned download URL',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async getDownloadUrl(
+    @Param('slug') slug: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const downloadUrl = await this.videosService.getDownloadUrl(slug);
+    res.redirect(downloadUrl);
   }
 }

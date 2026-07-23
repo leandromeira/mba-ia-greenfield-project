@@ -95,6 +95,39 @@ export class VideosService {
     return updatedVideo;
   }
 
+  async findReadyVideoBySlug(slug: string): Promise<Video> {
+    const video = await this.videoRepository.findOne({ where: { slug } });
+    if (!video || video.status !== VideoStatus.READY) {
+      throw new NotFoundException('Video not found or not ready');
+    }
+    return video;
+  }
+
+  async getVideoStream(
+    slug: string,
+    range?: string,
+  ): Promise<{
+    stream: import('stream').Readable;
+    contentLength?: number;
+    contentRange?: string;
+    contentType?: string;
+  }> {
+    const video = await this.findReadyVideoBySlug(slug);
+    return this.storageService.getObjectStream(
+      'streamtube-videos',
+      video.file_key,
+      range,
+    );
+  }
+
+  async getDownloadUrl(slug: string): Promise<string> {
+    const video = await this.findReadyVideoBySlug(slug);
+    return this.storageService.getPresignedDownloadUrl(
+      video.file_key,
+      video.original_filename,
+    );
+  }
+
   async enqueueVideoProcessing(
     videoId: string,
     fileKey: string,
