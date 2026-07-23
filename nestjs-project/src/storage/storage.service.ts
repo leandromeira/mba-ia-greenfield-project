@@ -43,13 +43,29 @@ export class StorageService implements OnModuleInit {
       const err = error as {
         $metadata?: { httpStatusCode?: number };
         name?: string;
+        code?: string;
       };
       if (err?.$metadata?.httpStatusCode === 404 || err?.name === 'NotFound') {
         this.logger.log(`Bucket ${bucketName} not found. Creating...`);
-        await this.s3Client.send(
-          new CreateBucketCommand({ Bucket: bucketName }),
+        try {
+          await this.s3Client.send(
+            new CreateBucketCommand({ Bucket: bucketName }),
+          );
+          this.logger.log(`Bucket ${bucketName} created successfully.`);
+        } catch (createErr) {
+          this.logger.warn(
+            `Could not create bucket ${bucketName}: ${createErr}`,
+          );
+        }
+      } else if (
+        err?.name === 'EndpointConnectionError' ||
+        err?.code === 'ENOTFOUND' ||
+        err?.code === 'ECONNREFUSED' ||
+        (error as Error)?.message?.includes('ENOTFOUND')
+      ) {
+        this.logger.warn(
+          `Storage endpoint not reachable at ${this.config.endpoint}. Skipping bucket creation.`,
         );
-        this.logger.log(`Bucket ${bucketName} created successfully.`);
       } else {
         throw error;
       }
