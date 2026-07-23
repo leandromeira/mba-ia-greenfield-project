@@ -57,6 +57,20 @@ A change is only considered complete when **all** of the following pass:
 If any of these fails, the task is not done — fix the underlying issue before declaring completion.
 
 
+## Detailed Architecture & Coding Rules
+
+Before implementing, refactoring, reviewing, or testing features in `nestjs-project/`, read and apply the detailed rules in `.agents/rules/`:
+
+- @.agents/rules/nestjs-common-conventions.md
+- @.agents/rules/nestjs-controllers.md
+- @.agents/rules/nestjs-dtos.md
+- @.agents/rules/nestjs-entities.md
+- @.agents/rules/nestjs-layer-separation.md
+- @.agents/rules/nestjs-modules.md
+- @.agents/rules/nestjs-services.md
+- @.agents/rules/nestjs-testing.md
+- @.agents/rules/typeorm-migrations.md
+
 ## Git Conventions
 
 - **Main branch:** `main` — never commit directly to it
