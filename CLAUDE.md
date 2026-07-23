@@ -59,8 +59,9 @@ If any of these fails, the task is not done — fix the underlying issue before 
 
 ## Detailed Architecture & Coding Rules
 
-Before implementing, refactoring, reviewing, or testing features in `nestjs-project/`, read and apply the detailed rules in `.agents/rules/`:
+Before implementing, refactoring, reviewing, or testing features in `nestjs-project/` or `next-frontend/`, read and apply the detailed rules in `.agents/rules/`:
 
+- @.agents/rules/auth-jwt.md
 - @.agents/rules/nestjs-common-conventions.md
 - @.agents/rules/nestjs-controllers.md
 - @.agents/rules/nestjs-dtos.md
@@ -69,7 +70,14 @@ Before implementing, refactoring, reviewing, or testing features in `nestjs-proj
 - @.agents/rules/nestjs-modules.md
 - @.agents/rules/nestjs-services.md
 - @.agents/rules/nestjs-testing.md
+- @.agents/rules/next-frontend-bff-api.md
+- @.agents/rules/next-frontend-code-quality.md
+- @.agents/rules/next-frontend-msw-mocks.md
+- @.agents/rules/next-frontend-testing.md
+- @.agents/rules/next-frontend-ui.md
 - @.agents/rules/typeorm-migrations.md
+- @.agents/rules/typeorm-queries.md
+- @.agents/rules/typescript-strict.md
 
 ## Git Conventions
 

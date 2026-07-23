@@ -1,67 +1,138 @@
-# Context — Phase 03: Upload e Processamento de Vídeos
-
-## Objective
-
-Implement the complete video management foundation: high-capacity video upload support (up to 10GB using direct-to-storage presigned S3 URLs), background processing queue using BullMQ + Redis, a dedicated video processing worker container using FFmpeg for metadata extraction and thumbnail generation, unique video URLs (12-char `node:crypto` generated slugs), HTTP 206 Byte-Range video streaming, direct video downloading, and explicit video status state management.
-
+---
+kind: phase
+name: phase-03-videos
+sources_mtime:
+  docs/project-plan.md: "2026-07-23T09:54:25-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-07-23T10:28:40-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-07-23T11:00:52-03:00"
 ---
 
-## Technical Context & Decisions
+# phase-03-videos — Context
 
-This phase builds directly upon the architecture established in Phase 01 (Base Configuration & NestJS Foundation) and Phase 02 (Authentication, Users, & Channels). All architectural decisions for Phase 03 have been analyzed, finalized, and marked as `Decided` in [`docs/decisions/technical-decisions-phase-03-videos.md`](../../decisions/technical-decisions-phase-03-videos.md):
+## Scope
 
-1. **TD-01: Message Queue Stack** — **BullMQ + Redis (`@nestjs/bullmq` + `ioredis`)**. Native NestJS module integration for background job dispatching, automatic retries with exponential backoff, concurrency tuning, and worker process isolation.
-2. **TD-02: 10GB Upload Strategy** — **Direct-to-Storage via S3 Presigned URLs / Multipart Upload**. Bypasses NestJS API memory and CPU limits entirely during 10GB file transfers.
-3. **TD-03: Object Storage Setup** — **MinIO Container (`compose.yaml`) + `@aws-sdk/client-s3` & `@aws-sdk/s3-request-presigner`**. 100% S3-compatible local development environment.
-4. **TD-04: Video Worker & Processing** — **Dedicated Worker Container (`video-worker`) running FFmpeg**. Isolated from NestJS HTTP API to extract duration, resolution, codec, and thumbnail without degrading API performance.
-5. **TD-05: Unique Video Identifier** — **Native `node:crypto` Helper (12-char URL-safe slug)** for public watch slugs (`slug`), avoiding external npm package overhead, combined with UUIDv4 primary keys (`id`) for internal DB relations.
-6. **TD-06: Video Streaming & Download** — **HTTP 206 Partial Content (Byte-Range requests)** streaming directly via NestJS streaming controller / presigned GET URLs, with direct download endpoints.
-7. **TD-07: Video Status Lifecycle** — State machine: `DRAFT` (upload initiated) → `PROCESSING` (upload complete, in queue) → `READY` (processed, streaming ready) / `FAILED` (processing error recorded).
+**Phase name:** Fase 03 — Upload e Processamento de Vídeos
 
----
+**Capabilities**
 
-## Domain Boundaries & Entity Relationships
+- Serviço de armazenamento de arquivos (vídeos e thumbnails)
+- Serviço de processamento em segundo plano (filas)
+- Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance
+- Pré-cadastro automático do vídeo como rascunho ao iniciar o upload
+- Processamento automático do vídeo após upload (extração de duração e metadados)
+- Geração automática de thumbnail a partir de um frame do vídeo
+- URL única por vídeo, sem conflito com outros vídeos
+- Reprodução via streaming (sem necessidade de download completo)
+- Download do vídeo pelo usuário
 
-- **Channel 1:N Video**: Videos belong to a `Channel` (which is linked 1:1 to a `User`). Only the channel owner can upload, edit, or delete their videos.
-- **Video Entity Attributes**:
-  - `id` (UUID, PK)
-  - `title` (string, default from filename or title prompt)
-  - `description` (text, optional)
-  - `slug` (string, unique indexed, 12-char native crypto slug)
-  - `status` (enum: `DRAFT`, `PROCESSING`, `READY`, `FAILED`)
-  - `original_filename` (string)
-  - `file_key` (string, S3 object key for video)
-  - `thumbnail_key` (string, optional S3 object key for thumbnail)
-  - `mime_type` (string, e.g. `video/mp4`)
-  - `size_bytes` (bigint/number)
-  - `duration_seconds` (number, float, optional — extracted by worker)
-  - `width` (integer, optional — extracted by worker)
-  - `height` (integer, optional — extracted by worker)
-  - `processing_error` (text, optional)
-  - `channel_id` (UUID, FK → channels)
-  - `created_at`, `updated_at` (timestamps)
+**Out of scope:** Edição de informações do vídeo, painel de administração do canal, comentários, likes/dislikes.
 
----
+**Deliverables:** upload de até 10GB funcional, processamento automático do vídeo, streaming funcionando, URLs únicas geradas.
 
-## Infrastructure Requirements (Docker Compose)
+**Affected subprojects:** `nestjs-project/`
 
-The backend `compose.yaml` must be expanded to include:
-- `redis`: Redis 7 alpine container on port `6379` (BullMQ broker).
-- `minio`: MinIO container on ports `9000` (S3 API) and `9001` (Web Console), creating default buckets `streamtube-videos` and `streamtube-thumbnails`.
-- `video-worker`: Dedicated Node.js worker service building from Dockerfile with FFmpeg installed, sharing the codebase and consuming `video-processing` queue jobs from Redis.
+**Deferred subprojects:** `next-frontend/`
 
----
+**Sequencing notes:** Depends on Fase 01 — Configuração Base do Projeto, Fase 02 — Cadastro, Login e Gerenciamento de Conta.
 
-## Deliverables Checklist
+**Neighbors (for boundary detection only):**
+- **Phase 02 (prior):** Cadastro, Login e Gerenciamento de Conta
+- **Phase 04 (next):** Gerenciamento de Vídeos e Canal
 
-- [x] Technical Decisions Document ([docs/decisions/technical-decisions-phase-03-videos.md](../../decisions/technical-decisions-phase-03-videos.md))
-- [ ] Phase Planning Docs (`context.md`, `validation.md` clean, `library-refs.md`, `phase-03-videos.md`, `progress.md`)
-- [ ] MinIO + Redis + Video Worker services added to `compose.yaml`
-- [ ] `Video` entity and TypeORM migration (`CreateVideosTable`)
-- [ ] Presigned upload URL generation service and endpoints (`POST /videos/upload-url`, `POST /videos/:id/complete-upload`)
-- [ ] BullMQ queue module and worker processor consuming video job events
-- [ ] FFmpeg metadata extraction and thumbnail generation logic in worker
-- [ ] Video streaming endpoint (`GET /videos/:slug/stream`) with HTTP 206 Partial Content support
-- [ ] Direct download endpoint (`GET /videos/:slug/download`)
-- [ ] Full unit, integration, and E2E test suite passing
-- [ ] `CLAUDE.md` / `AGENTS.md` updated with video module architecture and endpoints
+## Decisions Index
+
+| Ref | Source | Scope | Topic | Status | Decision | Libraries |
+|-----|--------|-------|-------|--------|----------|-----------|
+| phase-03-videos/TD-01 | technical-decisions-phase-03-videos.md | Backend | Message Queue & Job Processing Stack | decided | A (BullMQ + Redis) | `@nestjs/bullmq`^11.x, `bullmq`^5.x, `ioredis`^5.x |
+| phase-03-videos/TD-02 | technical-decisions-phase-03-videos.md | Backend | 10GB Large Video Upload Strategy | decided | A (Direct-to-Storage via S3 Presigned URLs & Multipart Upload) | `@aws-sdk/s3-request-presigner`^3.x |
+| phase-03-videos/TD-03 | technical-decisions-phase-03-videos.md | Backend | Object Storage Setup & Docker Env | decided | A (MinIO Container with `@aws-sdk/client-s3`) | `@aws-sdk/client-s3`^3.x |
+| phase-03-videos/TD-04 | technical-decisions-phase-03-videos.md | Backend | Video Worker & FFmpeg Strategy | decided | A (Dedicated Worker Container running FFmpeg) | `fluent-ffmpeg`^2.1.3 |
+| phase-03-videos/TD-05 | technical-decisions-phase-03-videos.md | Backend | Unique Video Identifier (Slug Strategy) | decided | A (Native `node:crypto` 12-char slug + UUID PK) | — |
+| phase-03-videos/TD-06 | technical-decisions-phase-03-videos.md | Backend | Video Streaming & Download Strategy | decided | A (HTTP 206 Byte-Range Streaming + Presigned GET Downloads) | — |
+| phase-03-videos/TD-07 | technical-decisions-phase-03-videos.md | Backend | Video Status Lifecycle State Machine | decided | A (Explicit Video Status Enum: DRAFT/PROCESSING/READY/FAILED) | — |
+
+_Source files:_
+
+- `docs/decisions/technical-decisions-phase-03-videos.md`
+
+## Capability Coverage
+
+| Capability (from project-plan.md) | Covered by |
+|-----------------------------------|------------|
+| Serviço de armazenamento de arquivos (vídeos e thumbnails) | phase-03-videos/TD-03 |
+| Serviço de processamento em segundo plano (filas) | phase-03-videos/TD-01 |
+| Upload de vídeos com suporte a arquivos de até 10GB sem impacto na performance | phase-03-videos/TD-02 |
+| Pré-cadastro automático do vídeo como rascunho ao iniciar o upload | phase-03-videos/TD-07 |
+| Processamento automático do vídeo após upload (extração de duração e metadados) | phase-03-videos/TD-04 |
+| Geração automática de thumbnail a partir de um frame do vídeo | phase-03-videos/TD-04 |
+| URL única por vídeo, sem conflito com outros vídeos | phase-03-videos/TD-05 |
+| Reprodução via streaming (sem necessidade de download completo) | phase-03-videos/TD-06 |
+| Download do vídeo pelo usuário | phase-03-videos/TD-06 |
+
+## Decisions Detail
+
+### phase-03-videos/TD-01
+
+**Recommendation:** BullMQ is the standard job queue solution for Node.js/NestJS. It provides official NestJS DI integration (`@nestjs/bullmq`), native job progress tracking, automatic retries with exponential backoff, and trivial Docker integration via a lightweight Redis container.
+**Libraries:** `@nestjs/bullmq`^11.x, `bullmq`^5.x, `ioredis`^5.x
+
+### phase-03-videos/TD-02
+
+**Recommendation:** Direct-to-Storage via S3 Presigned URLs & Multipart Upload eliminates API resource saturation entirely, allows 10GB uploads to bypass Node.js process memory limits, and leverages S3/MinIO native capabilities for chunked multipart uploads and resumability.
+**Libraries:** `@aws-sdk/s3-request-presigner`^3.x
+
+### phase-03-videos/TD-03
+
+**Recommendation:** MinIO Container with `@aws-sdk/client-s3` matches the architectural plan in `docs/project-plan.md`. Provides true S3 API parity in local Docker, allowing `@aws-sdk/client-s3` to be used across all environments without branching codebase logic.
+**Libraries:** `@aws-sdk/client-s3`^3.x
+
+### phase-03-videos/TD-04
+
+**Recommendation:** Dedicated Worker Container running FFmpeg ensures resource isolation between HTTP request handling and heavy video media processing, keeping API response times fast and consistent even under heavy upload load.
+**Libraries:** `fluent-ffmpeg`^2.1.3
+
+### phase-03-videos/TD-05
+
+**Recommendation:** Native `node:crypto` for public slug + UUIDv4 for internal PK provides cryptographically secure 12-char URL-safe slugs with zero extra npm dependencies, avoiding ESM/CJS compatibility issues while keeping URLs clean like YouTube. Use UUIDv4 for internal database primary keys (`id`).
+**Libraries:** —
+
+### phase-03-videos/TD-06
+
+**Recommendation:** HTTP 206 Byte-Range Streaming + Presigned GET Downloads fulfills all Phase 03 requirements (immediate playback without full download + direct file download) using standard HTTP Byte-Ranges and HTML5 video player compatibility.
+**Libraries:** —
+
+### phase-03-videos/TD-07
+
+**Recommendation:** Explicit Video Status Enum provides robust state management, clear user feedback on processing status, and safe streaming validation.
+**Libraries:** —
+
+## Inherited Decisions Detail
+
+_No inherited TD details._
+
+## Inherited Conventions
+
+- Follow NestJS common conventions and module layer separation _(from phase 01)_
+- All HTTP domain errors return standard `{ statusCode, error, message }` shape _(from phase 02)_
+- Database tables use lower_snake_case with singular entity names _(from phase 02)_
+
+## Inherited Deferred Capabilities
+
+_No inherited deferred capabilities._
+
+## Non-UI / Deferred Capabilities
+
+_None._
+
+## Testing Requirements
+
+### nestjs-project
+
+| Artifact type | Required layers |
+|---------------|-----------------|
+| Config Namespace | Unit |
+| Storage Service | Unit + Integration |
+| Video Entity | Integration |
+| Video Controller | Unit + E2E |
+| Video Processor Worker | Unit + Integration |
+| Streaming Controller | Unit + E2E |
