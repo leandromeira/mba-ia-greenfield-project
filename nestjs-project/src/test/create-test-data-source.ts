@@ -24,8 +24,9 @@ export function createTestDataSource(
 }
 
 export async function cleanAllTables(dataSource: DataSource): Promise<void> {
-  await dataSource.query('DELETE FROM "refresh_tokens"');
-  await dataSource.query('DELETE FROM "verification_tokens"');
-  await dataSource.query('DELETE FROM "channels"');
-  await dataSource.query('DELETE FROM "users"');
+  await dataSource.query('DELETE FROM "videos"').catch(() => {});
+  await dataSource.query('DELETE FROM "refresh_tokens"').catch(() => {});
+  await dataSource.query('DELETE FROM "verification_tokens"').catch(() => {});
+  await dataSource.query('DELETE FROM "channels"').catch(() => {});
+  await dataSource.query('DELETE FROM "users"').catch(() => {});
 }
