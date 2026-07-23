@@ -34,6 +34,10 @@ docker compose exec nestjs-api npm run start:dev
 Services:
 - `nestjs-api` — NestJS API, port `3000`
 - `db` — PostgreSQL 17, port `5432`, database `streamtube`, user/password `streamtube`
+- `redis` — Redis 7.4, port `6379`
+- `minio` — MinIO Object Storage, S3 API port `9000`, Console port `9001`
+- `video-worker` — Background Video Processing Worker (Node.js 22 + FFmpeg)
+- `mailpit` — Mailpit SMTP testing UI, port `8025`
 
 All verification and teardown commands run on the **host machine**:
 
@@ -146,8 +150,18 @@ Whenever possible, prefer storing only the bare address in `.env` and composing 
 
 NestJS with standard module structure. Source lives in `src/`, compiled output in `dist/`.
 
-- Each domain feature gets its own module (e.g., `UsersModule`, `VideosModule`) registered in `AppModule`
-- Controllers handle HTTP routing; Services hold business logic; both are scoped to their module
+- Each domain feature gets its own module (`UsersModule`, `ChannelsModule`, `VideosModule`, `StorageModule`, `WorkerModule`) registered in `AppModule` or worker entry.
+- Controllers handle HTTP routing; Services hold business logic; both are scoped to their module.
+
+### Core Modules (Phase 03)
+
+- **`VideosModule` (`src/videos/`)**: Video entity management, upload URL presigning, upload completion handler, HTTP 206 byte-range streaming, and direct download links.
+  - `POST /videos/upload-url` (JWT) — Request S3 presigned PUT URL for upload (creates `DRAFT` record).
+  - `POST /videos/:id/complete-upload` (JWT) — Mark upload complete (transitions status to `PROCESSING` and dispatches BullMQ job).
+  - `GET /videos/:slug/stream` (Public) — Stream video with HTTP 206 Partial Content range header support.
+  - `GET /videos/:slug/download` (Public) — Get direct GET presigned download URL with attachment disposition.
+- **`StorageModule` (`src/storage/`)**: Wrapper around `@aws-sdk/client-s3` for S3/MinIO bucket auto-creation, presigned upload/download URLs, and object streaming.
+- **`WorkerModule` (`src/worker/`)**: BullMQ worker consumer (`VideoProcessor`) processing `video-processing` jobs. Downloads video from storage, extracts metadata (`duration`, `width`, `height`) via `ffprobe`, generates JPEG thumbnails via `ffmpeg`, uploads thumbnails to `streamtube-thumbnails`, and transitions video status to `READY` (or `FAILED`).
 
 ## Code Conventions
 
