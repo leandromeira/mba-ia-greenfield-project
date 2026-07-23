@@ -31,6 +31,7 @@ export class Video {
   @Column({
     type: 'enum',
     enum: VideoStatus,
+    enumName: 'video_status',
     default: VideoStatus.DRAFT,
   })
   status: VideoStatus;
