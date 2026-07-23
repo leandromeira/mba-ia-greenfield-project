@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { Channel } from '../channels/entities/channel.entity';
 import { StorageService } from '../storage/storage.service';
@@ -22,6 +24,8 @@ export class VideosService {
     @InjectRepository(Channel)
     private readonly channelRepository: Repository<Channel>,
     private readonly storageService: StorageService,
+    @InjectQueue('video-processing')
+    private readonly videoQueue: Queue,
   ) {}
 
   async createUploadUrl(
@@ -86,6 +90,25 @@ export class VideosService {
     }
 
     video.status = VideoStatus.PROCESSING;
-    return this.videoRepository.save(video);
+    const updatedVideo = await this.videoRepository.save(video);
+    await this.enqueueVideoProcessing(updatedVideo.id, updatedVideo.file_key);
+    return updatedVideo;
+  }
+
+  async enqueueVideoProcessing(
+    videoId: string,
+    fileKey: string,
+  ): Promise<void> {
+    await this.videoQueue.add(
+      'process-video',
+      { videoId, fileKey },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      },
+    );
   }
 }

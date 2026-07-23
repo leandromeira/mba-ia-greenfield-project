@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { getQueueToken } from '@nestjs/bullmq';
 import {
   ForbiddenException,
   NotFoundException,
@@ -24,6 +25,9 @@ describe('VideosService', () => {
   let storageServiceMock: {
     getPresignedUploadUrl: jest.Mock;
   };
+  let videoQueueMock: {
+    add: jest.Mock;
+  };
 
   beforeEach(async () => {
     videoRepoMock = {
@@ -47,6 +51,10 @@ describe('VideosService', () => {
         .mockResolvedValue('http://minio:9000/presigned-put-url'),
     };
 
+    videoQueueMock = {
+      add: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         VideosService,
@@ -61,6 +69,10 @@ describe('VideosService', () => {
         {
           provide: StorageService,
           useValue: storageServiceMock,
+        },
+        {
+          provide: getQueueToken('video-processing'),
+          useValue: videoQueueMock,
         },
       ],
     }).compile();

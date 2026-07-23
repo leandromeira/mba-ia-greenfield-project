@@ -2,16 +2,19 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, type ConfigType } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
-import { Channel } from '../channels/entities/channel.entity';
 import redisConfig from '../config/redis.config';
+import databaseConfig from '../config/database.config';
 import { StorageModule } from '../storage/storage.module';
-import { Video } from './entities/video.entity';
-import { VideosController } from './videos.controller';
-import { VideosService } from './videos.service';
+import { Video } from '../videos/entities/video.entity';
+import { VideoProcessor } from './video-processor';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Video, Channel]),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [redisConfig, databaseConfig],
+    }),
+    TypeOrmModule.forFeature([Video]),
     StorageModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
@@ -27,8 +30,6 @@ import { VideosService } from './videos.service';
       name: 'video-processing',
     }),
   ],
-  controllers: [VideosController],
-  providers: [VideosService],
-  exports: [VideosService, TypeOrmModule, BullModule],
+  providers: [VideoProcessor],
 })
-export class VideosModule {}
+export class WorkerModule {}
