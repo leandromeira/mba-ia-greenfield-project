@@ -1,4 +1,3 @@
-import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -150,19 +149,11 @@ export class VideoProcessor extends WorkerHost {
     key: string,
     buffer: Buffer,
   ): Promise<void> {
-    const s3Client = (
-      this.storageService as unknown as {
-        s3Client: { send: (cmd: unknown) => Promise<unknown> };
-      }
-    ).s3Client;
-
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: 'streamtube-thumbnails',
-        Key: key,
-        Body: buffer,
-        ContentType: 'image/jpeg',
-      }),
+    await this.storageService.uploadObject(
+      'streamtube-thumbnails',
+      key,
+      buffer,
+      'image/jpeg',
     );
   }
 

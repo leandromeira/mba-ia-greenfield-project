@@ -42,7 +42,7 @@
 
 ## Verification & Definition of Done Checks
 
-- [ ] All unit, integration, and E2E tests passing
-- [ ] `npx tsc --noEmit` exits with code 0
-- [ ] `npm run lint` passes with 0 errors
-- [ ] All SIs completed and marked in progress table
+- [x] All unit, integration, and E2E tests passing
+- [x] `npx tsc --noEmit` exits with code 0
+- [x] `npm run lint` passes with 0 errors
+- [x] All SIs completed and marked in progress table

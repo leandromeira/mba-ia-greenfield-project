@@ -121,4 +121,20 @@ export class StorageService implements OnModuleInit {
       contentType: response.ContentType,
     };
   }
+
+  async uploadObject(
+    bucket: string,
+    key: string,
+    body: Buffer | Readable,
+    contentType: string,
+  ): Promise<void> {
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      }),
+    );
+  }
 }
