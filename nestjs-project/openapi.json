@@ -438,6 +438,204 @@
           "auth"
         ]
       }
+    },
+    "/videos/upload-url": {
+      "post": {
+        "description": "Creates a new video record in DRAFT status and returns a presigned S3 PUT URL for direct-to-storage upload.",
+        "operationId": "VideosController_createUploadUrl",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVideoUploadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Presigned upload URL created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoUploadResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed or invalid input data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "User does not have a channel",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Request presigned upload URL",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{id}/complete-upload": {
+      "post": {
+        "description": "Signals that file upload to S3 is complete, transitioning video status from DRAFT to PROCESSING.",
+        "operationId": "VideosController_completeUpload",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video status transitioned to PROCESSING"
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - user does not own this video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Video not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Signal upload completion",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{slug}/stream": {
+      "get": {
+        "description": "Public endpoint to stream video content with Range header support for video seeking.",
+        "operationId": "VideosController_streamVideo",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "206": {
+            "description": "Partial content video stream"
+          },
+          "404": {
+            "description": "Video not found or not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Stream video (HTTP 206 Partial Content)",
+        "tags": [
+          "videos"
+        ]
+      }
+    },
+    "/videos/{slug}/download": {
+      "get": {
+        "description": "Public endpoint to obtain a direct presigned GET download URL with attachment disposition.",
+        "operationId": "VideosController_getDownloadUrl",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Redirects to presigned download URL"
+          },
+          "404": {
+            "description": "Video not found or not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get video download URL",
+        "tags": [
+          "videos"
+        ]
+      }
     }
   },
   "info": {
@@ -480,6 +678,43 @@
       "ResetPasswordDto": {
         "type": "object",
         "properties": {}
+      },
+      "CreateVideoUploadDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "VideoUploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "video_id": {
+            "type": "string",
+            "description": "ID of the created video record"
+          },
+          "slug": {
+            "type": "string",
+            "description": "Unique 12-char URL-safe slug"
+          },
+          "upload_url": {
+            "type": "string",
+            "description": "S3 Presigned PUT URL for direct file upload"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "PROCESSING",
+              "READY",
+              "FAILED"
+            ],
+            "description": "Initial video status (DRAFT)"
+          }
+        },
+        "required": [
+          "video_id",
+          "slug",
+          "upload_url",
+          "status"
+        ]
       },
       "ApiErrorEnvelope": {
         "type": "object",
