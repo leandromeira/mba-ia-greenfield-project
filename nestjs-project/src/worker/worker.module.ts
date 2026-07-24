@@ -9,6 +9,7 @@ import storageConfig from '../config/storage.config';
 import { envValidationSchema } from '../config/env.validation';
 import { StorageModule } from '../storage/storage.module';
 import { Video } from '../videos/entities/video.entity';
+import { Channel } from '../channels/entities/channel.entity';
 import { VideoProcessor } from './video-processor';
 
 @Module({
@@ -33,7 +34,7 @@ import { VideoProcessor } from './video-processor';
         synchronize: false,
       }),
     }),
-    TypeOrmModule.forFeature([Video]),
+    TypeOrmModule.forFeature([Video, Channel]),
     StorageModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],

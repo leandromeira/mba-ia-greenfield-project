@@ -1,20 +1,21 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
 import { Channel } from '../channels/entities/channel.entity';
+import storageConfig from '../config/storage.config';
 import { StorageService } from '../storage/storage.service';
 import { generateSlug } from '../common/utils/slug.util';
 import { CreateVideoUploadDto } from './dto/create-video-upload.dto';
 import { VideoUploadResponseDto } from './dto/video-upload-response.dto';
 import { Video } from './entities/video.entity';
 import { VideoStatus } from './enums/video-status.enum';
+import { ChannelNotFoundException } from './exceptions/channel-not-found.exception';
+import { VideoForbiddenException } from './exceptions/video-forbidden.exception';
+import { VideoNotFoundException } from './exceptions/video-not-found.exception';
+import { VideoNotDraftException } from './exceptions/video-not-draft.exception';
 
 @Injectable()
 export class VideosService {
@@ -26,6 +27,8 @@ export class VideosService {
     private readonly storageService: StorageService,
     @InjectQueue('video-processing')
     private readonly videoQueue: Queue,
+    @Inject(storageConfig.KEY)
+    private readonly s3Config: ConfigType<typeof storageConfig>,
   ) {}
 
   async createUploadUrl(
@@ -37,7 +40,7 @@ export class VideosService {
     });
 
     if (!channel) {
-      throw new ForbiddenException('User does not have an active channel');
+      throw new ChannelNotFoundException();
     }
 
     const slug = generateSlug();
@@ -76,17 +79,15 @@ export class VideosService {
     });
 
     if (!video) {
-      throw new NotFoundException('Video not found');
+      throw new VideoNotFoundException('Video not found');
     }
 
     if (video.channel.user_id !== userId) {
-      throw new ForbiddenException(
-        'You do not have permission to manage this video',
-      );
+      throw new VideoForbiddenException();
     }
 
     if (video.status !== VideoStatus.DRAFT) {
-      throw new BadRequestException('Video is not in DRAFT status');
+      throw new VideoNotDraftException();
     }
 
     video.status = VideoStatus.PROCESSING;
@@ -98,7 +99,7 @@ export class VideosService {
   async findReadyVideoBySlug(slug: string): Promise<Video> {
     const video = await this.videoRepository.findOne({ where: { slug } });
     if (!video || video.status !== VideoStatus.READY) {
-      throw new NotFoundException('Video not found or not ready');
+      throw new VideoNotFoundException('Video not found or not ready');
     }
     return video;
   }
@@ -114,7 +115,7 @@ export class VideosService {
   }> {
     const video = await this.findReadyVideoBySlug(slug);
     return this.storageService.getObjectStream(
-      'streamtube-videos',
+      this.s3Config.bucketVideos,
       video.file_key,
       range,
     );

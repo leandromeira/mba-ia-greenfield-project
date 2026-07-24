@@ -1,5 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
 import ffmpeg from 'fluent-ffmpeg';
@@ -7,6 +8,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Repository } from 'typeorm';
+import storageConfig from '../config/storage.config';
 import { StorageService } from '../storage/storage.service';
 import { Video } from '../videos/entities/video.entity';
 import { VideoStatus } from '../videos/enums/video-status.enum';
@@ -25,6 +27,8 @@ export class VideoProcessor extends WorkerHost {
     @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
     private readonly storageService: StorageService,
+    @Inject(storageConfig.KEY)
+    private readonly s3Config: ConfigType<typeof storageConfig>,
   ) {
     super();
   }
@@ -48,7 +52,7 @@ export class VideoProcessor extends WorkerHost {
 
     try {
       const { stream } = await this.storageService.getObjectStream(
-        'streamtube-videos',
+        this.s3Config.bucketVideos,
         fileKey,
       );
 
@@ -150,7 +154,7 @@ export class VideoProcessor extends WorkerHost {
     buffer: Buffer,
   ): Promise<void> {
     await this.storageService.uploadObject(
-      'streamtube-thumbnails',
+      this.s3Config.bucketThumbnails,
       key,
       buffer,
       'image/jpeg',

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Job } from 'bullmq';
+import storageConfig from '../config/storage.config';
 import { StorageService } from '../storage/storage.service';
 import { Video } from '../videos/entities/video.entity';
 import { VideoStatus } from '../videos/enums/video-status.enum';
@@ -15,6 +16,15 @@ describe('VideoProcessor', () => {
   let storageServiceMock: {
     getObjectStream: jest.Mock;
     getPresignedUploadUrl: jest.Mock;
+  };
+
+  const mockStorageConfig = {
+    endpoint: 'http://localhost:9000',
+    region: 'us-east-1',
+    accessKey: 'minioadmin',
+    secretKey: 'minioadmin',
+    bucketVideos: 'streamtube-videos',
+    bucketThumbnails: 'streamtube-thumbnails',
   };
 
   beforeEach(async () => {
@@ -38,6 +48,10 @@ describe('VideoProcessor', () => {
         {
           provide: StorageService,
           useValue: storageServiceMock,
+        },
+        {
+          provide: storageConfig.KEY,
+          useValue: mockStorageConfig,
         },
       ],
     }).compile();

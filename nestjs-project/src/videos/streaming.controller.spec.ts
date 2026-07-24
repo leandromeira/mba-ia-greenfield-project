@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { VideoNotFoundException } from './exceptions/video-not-found.exception';
 import { Readable } from 'stream';
 import { Repository } from 'typeorm';
 import { Queue } from 'bullmq';
@@ -16,6 +16,15 @@ describe('VideosService Streaming & Download', () => {
     getPresignedDownloadUrl: jest.Mock;
   };
 
+  const mockStorageConfig = {
+    endpoint: 'http://localhost:9000',
+    region: 'us-east-1',
+    accessKey: 'minioadmin',
+    secretKey: 'minioadmin',
+    bucketVideos: 'streamtube-videos',
+    bucketThumbnails: 'streamtube-thumbnails',
+  };
+
   beforeEach(() => {
     videoRepoMock = { findOne: jest.fn() };
     storageServiceMock = {
@@ -28,24 +37,25 @@ describe('VideosService Streaming & Download', () => {
       {} as unknown as Repository<Channel>,
       storageServiceMock as unknown as StorageService,
       {} as unknown as Queue,
+      mockStorageConfig as any,
     );
   });
 
   describe('findReadyVideoBySlug', () => {
-    it('should throw NotFoundException if video does not exist', async () => {
+    it('should throw VideoNotFoundException if video does not exist', async () => {
       videoRepoMock.findOne.mockResolvedValue(null);
       await expect(service.findReadyVideoBySlug('nonexistent')).rejects.toThrow(
-        NotFoundException,
+        VideoNotFoundException,
       );
     });
 
-    it('should throw NotFoundException if video status is DRAFT', async () => {
+    it('should throw VideoNotFoundException if video status is DRAFT', async () => {
       videoRepoMock.findOne.mockResolvedValue({
         slug: 'draftslug',
         status: VideoStatus.DRAFT,
       });
       await expect(service.findReadyVideoBySlug('draftslug')).rejects.toThrow(
-        NotFoundException,
+        VideoNotFoundException,
       );
     });
 

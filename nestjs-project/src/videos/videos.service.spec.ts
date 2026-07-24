@@ -1,16 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { getQueueToken } from '@nestjs/bullmq';
-import {
-  ForbiddenException,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
 import { Channel } from '../channels/entities/channel.entity';
+import storageConfig from '../config/storage.config';
 import { StorageService } from '../storage/storage.service';
 import { Video } from './entities/video.entity';
 import { VideoStatus } from './enums/video-status.enum';
 import { VideosService } from './videos.service';
+import { ChannelNotFoundException } from './exceptions/channel-not-found.exception';
+import { VideoNotFoundException } from './exceptions/video-not-found.exception';
+import { VideoForbiddenException } from './exceptions/video-forbidden.exception';
+import { VideoNotDraftException } from './exceptions/video-not-draft.exception';
 
 describe('VideosService', () => {
   let service: VideosService;
@@ -24,9 +24,19 @@ describe('VideosService', () => {
   };
   let storageServiceMock: {
     getPresignedUploadUrl: jest.Mock;
+    getObjectStream: jest.Mock;
   };
   let videoQueueMock: {
     add: jest.Mock;
+  };
+
+  const mockStorageConfig = {
+    endpoint: 'http://localhost:9000',
+    region: 'us-east-1',
+    accessKey: 'minioadmin',
+    secretKey: 'minioadmin',
+    bucketVideos: 'streamtube-videos',
+    bucketThumbnails: 'streamtube-thumbnails',
   };
 
   beforeEach(async () => {
@@ -49,6 +59,7 @@ describe('VideosService', () => {
       getPresignedUploadUrl: jest
         .fn()
         .mockResolvedValue('http://minio:9000/presigned-put-url'),
+      getObjectStream: jest.fn(),
     };
 
     videoQueueMock = {
@@ -74,6 +85,10 @@ describe('VideosService', () => {
           provide: getQueueToken('video-processing'),
           useValue: videoQueueMock,
         },
+        {
+          provide: storageConfig.KEY,
+          useValue: mockStorageConfig,
+        },
       ],
     }).compile();
 
@@ -85,7 +100,7 @@ describe('VideosService', () => {
   });
 
   describe('createUploadUrl', () => {
-    it('should throw ForbiddenException if user has no channel', async () => {
+    it('should throw ChannelNotFoundException if user has no channel', async () => {
       channelRepoMock.findOne.mockResolvedValue(null);
 
       await expect(
@@ -95,7 +110,7 @@ describe('VideosService', () => {
           mime_type: 'video/mp4',
           size_bytes: 1048576,
         }),
-      ).rejects.toThrow(ForbiddenException);
+      ).rejects.toThrow(ChannelNotFoundException);
     });
 
     it('should create draft video and return presigned upload url when user has a channel', async () => {
@@ -119,15 +134,15 @@ describe('VideosService', () => {
   });
 
   describe('completeUpload', () => {
-    it('should throw NotFoundException if video is not found', async () => {
+    it('should throw VideoNotFoundException if video is not found', async () => {
       videoRepoMock.findOne.mockResolvedValue(null);
 
       await expect(
         service.completeUpload('user-1', 'invalid-id'),
-      ).rejects.toThrow(NotFoundException);
+      ).rejects.toThrow(VideoNotFoundException);
     });
 
-    it('should throw ForbiddenException if video belongs to another channel', async () => {
+    it('should throw VideoForbiddenException if video belongs to another channel', async () => {
       videoRepoMock.findOne.mockResolvedValue({
         id: 'video-1',
         status: VideoStatus.DRAFT,
@@ -135,11 +150,11 @@ describe('VideosService', () => {
       });
 
       await expect(service.completeUpload('user-1', 'video-1')).rejects.toThrow(
-        ForbiddenException,
+        VideoForbiddenException,
       );
     });
 
-    it('should throw BadRequestException if video status is not DRAFT', async () => {
+    it('should throw VideoNotDraftException if video status is not DRAFT', async () => {
       videoRepoMock.findOne.mockResolvedValue({
         id: 'video-1',
         status: VideoStatus.READY,
@@ -147,7 +162,7 @@ describe('VideosService', () => {
       });
 
       await expect(service.completeUpload('user-1', 'video-1')).rejects.toThrow(
-        BadRequestException,
+        VideoNotDraftException,
       );
     });
 

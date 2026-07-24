@@ -236,7 +236,16 @@ Deliver complete video management and asynchronous processing capabilities for S
 
 ---
 
-## Technical Specifications
+### Technical Specifications
+
+### API Contracts
+
+| Method | Endpoint | Auth Required | Request Payload | Success Response | Error Response |
+| :--- | :--- | :---: | :--- | :--- | :--- |
+| `POST` | `/videos/upload-url` | ✅ Bearer JWT | `{ title, description?, original_filename, mime_type, size_bytes }` | `201 Created` `{ video_id, slug, upload_url, status }` | `401 Unauthorized`<br>`403 Forbidden` (No channel) |
+| `POST` | `/videos/:id/complete-upload` | ✅ Bearer JWT | None | `200 OK` `Video` object with `status: PROCESSING` | `401 Unauthorized`<br>`403 Forbidden`<br>`404 Not Found` |
+| `GET` | `/videos/:slug/stream` | ❌ Public | Headers: `Range: bytes=start-end` | `206 Partial Content` (Video Byte Stream) | `404 Not Found` |
+| `GET` | `/videos/:slug/download` | ❌ Public | None | `302 Found` (Redirect to Presigned S3 GET URL) | `404 Not Found` |
 
 ### Data Model (`Video` Entity Schema)
 

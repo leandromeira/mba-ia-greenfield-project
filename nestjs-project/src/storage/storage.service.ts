@@ -6,6 +6,11 @@ import {
   CreateBucketCommand,
   PutObjectCommand,
   GetObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  CompletedPart,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Readable } from 'stream';
@@ -83,6 +88,60 @@ export class StorageService implements OnModuleInit {
       ContentType: contentType,
     });
     return getSignedUrl(this.s3Client, command, { expiresIn });
+  }
+
+  async createMultipartUpload(
+    key: string,
+    contentType: string,
+  ): Promise<string> {
+    const command = new CreateMultipartUploadCommand({
+      Bucket: this.config.bucketVideos,
+      Key: key,
+      ContentType: contentType,
+    });
+    const response = await this.s3Client.send(command);
+    if (!response.UploadId) {
+      throw new Error('Failed to create multipart upload: missing UploadId');
+    }
+    return response.UploadId;
+  }
+
+  async getPresignedUploadPartUrl(
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    expiresIn = 3600,
+  ): Promise<string> {
+    const command = new UploadPartCommand({
+      Bucket: this.config.bucketVideos,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: partNumber,
+    });
+    return getSignedUrl(this.s3Client, command, { expiresIn });
+  }
+
+  async completeMultipartUpload(
+    key: string,
+    uploadId: string,
+    parts: CompletedPart[],
+  ): Promise<void> {
+    const command = new CompleteMultipartUploadCommand({
+      Bucket: this.config.bucketVideos,
+      Key: key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: parts },
+    });
+    await this.s3Client.send(command);
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    const command = new AbortMultipartUploadCommand({
+      Bucket: this.config.bucketVideos,
+      Key: key,
+      UploadId: uploadId,
+    });
+    await this.s3Client.send(command);
   }
 
   async getPresignedDownloadUrl(
