@@ -132,20 +132,16 @@ export class VideoProcessor extends WorkerHost {
     thumbPath: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const folder = path.dirname(thumbPath);
-      const filename = path.basename(thumbPath);
       ffmpeg(videoPath)
-        .screenshots({
-          count: 1,
-          timestamps: ['1.0'],
-          filename,
-          folder,
-          size: '1280x720',
-        })
+        .seekInput(0)
+        .frames(1)
+        .size('1280x720')
+        .output(thumbPath)
         .on('end', () => resolve())
         .on('error', (err) =>
           reject(err instanceof Error ? err : new Error(String(err))),
-        );
+        )
+        .run();
     });
   }
 

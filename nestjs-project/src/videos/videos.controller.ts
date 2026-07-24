@@ -9,6 +9,7 @@ import {
   Post,
   Res,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import {
   ApiBearerAuth,
@@ -100,6 +101,7 @@ export class VideosController {
   }
 
   @Public()
+  @SkipThrottle()
   @Get(':slug/stream')
   @HttpCode(HttpStatus.PARTIAL_CONTENT)
   @ApiOperation({
@@ -139,6 +141,7 @@ export class VideosController {
   }
 
   @Public()
+  @SkipThrottle()
   @Get(':slug/download')
   @ApiOperation({
     summary: 'Get video download URL',
